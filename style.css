@@ -1,0 +1,138 @@
+:root {
+    --bg-color: #111;
+    --text-color: #fff;
+    --accent: #00ffcc;
+    --canvas-bg: #000;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+#game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+}
+
+header {
+    width: 800px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+h1 {
+    font-size: 2.5rem;
+    color: var(--accent);
+    letter-spacing: 5px;
+}
+
+.scoreboard {
+    font-size: 3rem;
+    font-weight: bold;
+}
+
+.divider {
+    margin: 0 20px;
+    opacity: 0.5;
+}
+
+canvas {
+    background-color: var(--canvas-bg);
+    border: 2px solid #333;
+    box-shadow: 0 0 20px rgba(0, 255, 204, 0.2);
+}
+
+#controls-panel {
+    width: 800px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    background: #222;
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+label {
+    font-size: 0.9rem;
+    color: #aaa;
+}
+
+select, input[type="range"] {
+    background: #333;
+    color: white;
+    border: 1px solid #444;
+    padding: 5px;
+    border-radius: 4px;
+}
+
+button {
+    background-color: var(--accent);
+    color: #000;
+    border: none;
+    padding: 10px 20px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.1s, background-color 0.2s;
+}
+
+button:hover {
+    background-color: #00e6b8;
+    transform: scale(1.05);
+}
+
+#instructions {
+    margin-top: 15px;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+#gameOverScreen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+#gameOverScreen.hidden {
+    display: none;
+}
+
+#winnerText {
+    font-size: 4rem;
+    color: var(--accent);
+    margin-bottom: 30px;
+    text-shadow: 0 0 10px var(--accent);
+}
