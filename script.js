@@ -59,10 +59,18 @@ let hue = 0;
 const keys = { w: false, s: false, ArrowUp: false, ArrowDown: false };
 
 const ball = { x: 400, y: 250, radius: 6, speed: 6, vx: 6, vy: 6, trail: [] };
-const paddleProps = { width: 8, height: 75, speed: 8 };
 
-const player1 = { x: 30, y: 212.5, lastY: 212.5, score: 0, color: '#ff0055' };
-const player2 = { x: 762, y: 212.5, lastY: 212.5, score: 0, color: '#00eeff' };
+// Paddle physics settings
+const paddleProps = { 
+    width: 8, 
+    height: 75, 
+    friction: 0.82, // How fast the paddle slows down (closer to 1 = more glide)
+    acceleration: 2.5 // How fast it speeds up
+};
+
+// Added vy (vertical velocity) to track momentum
+const player1 = { x: 30, y: 212.5, vy: 0, lastY: 212.5, score: 0, color: '#ff0055' };
+const player2 = { x: 762, y: 212.5, vy: 0, lastY: 212.5, score: 0, color: '#00eeff' };
 
 let particles = [];
 
@@ -71,7 +79,8 @@ window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key)) keys[e
 
 speedInput.addEventListener('input', (e) => {
     speedValue.innerText = e.target.value;
-    paddleProps.speed = parseInt(e.target.value);
+    // Map the 5-15 slider to a reasonable acceleration curve
+    paddleProps.acceleration = parseInt(e.target.value) * 0.3;
 });
 
 startBtn.addEventListener('click', () => { initAudio(); startGame(); });
@@ -101,6 +110,8 @@ function resetBall(scorer) {
 
 function startGame() {
     player1.score = 0; player2.score = 0;
+    player1.y = 212.5; player2.y = 212.5;
+    player1.vy = 0; player2.vy = 0;
     score1El.innerText = 0; score2El.innerText = 0;
     resetBall(Math.random() > 0.5 ? 1 : 2);
     particles = [];
@@ -112,8 +123,8 @@ function startGame() {
 function triggerHitJuice(x, y, color) {
     playSound('hit');
     spawnParticles(x, y, color, 15, 1);
-    hitPauseFrames = 4; // Freeze game for 4 frames
-    shakeAmount = ball.speed * 0.8; // Screen shake scales with ball speed
+    hitPauseFrames = 4;
+    shakeAmount = ball.speed * 0.8; 
 }
 
 function update() {
@@ -127,26 +138,46 @@ function update() {
     player1.lastY = player1.y;
     player2.lastY = player2.y;
 
-    if (keys.w && player1.y > 0) player1.y -= paddleProps.speed;
-    if (keys.s && player1.y < canvas.height - paddleProps.height) player1.y += paddleProps.speed;
+    // --- SMOOTH PADDLE PHYSICS ---
 
+    // Player 1 Acceleration
+    if (keys.w) player1.vy -= paddleProps.acceleration;
+    if (keys.s) player1.vy += paddleProps.acceleration;
+
+    // Apply friction and update position
+    player1.vy *= paddleProps.friction;
+    player1.y += player1.vy;
+
+    // Clamp to screen bounds
+    if (player1.y < 0) { player1.y = 0; player1.vy = 0; }
+    if (player1.y > canvas.height - paddleProps.height) { player1.y = canvas.height - paddleProps.height; player1.vy = 0; }
+
+    // Player 2 / AI
     const mode = modeSelect.value;
     if (mode === '2') {
-        if (keys.ArrowUp && player2.y > 0) player2.y -= paddleProps.speed;
-        if (keys.ArrowDown && player2.y < canvas.height - paddleProps.height) player2.y += paddleProps.speed;
+        // Player 2 Acceleration
+        if (keys.ArrowUp) player2.vy -= paddleProps.acceleration;
+        if (keys.ArrowDown) player2.vy += paddleProps.acceleration;
+        
+        player2.vy *= paddleProps.friction;
+        player2.y += player2.vy;
     } else {
-        // Natural AI Interpolation
+        // Smooth AI Interpolation
         if (ball.vx > 0) {
             let targetY = ball.y - paddleProps.height / 2;
-            player2.y += (targetY - player2.y) * 0.08; 
-            // Clamp to screen
-            if(player2.y < 0) player2.y = 0;
-            if(player2.y > canvas.height - paddleProps.height) player2.y = canvas.height - paddleProps.height;
+            player2.y += (targetY - player2.y) * 0.1; 
         } else {
             let targetY = canvas.height / 2 - paddleProps.height / 2;
-            player2.y += (targetY - player2.y) * 0.03;
+            player2.y += (targetY - player2.y) * 0.05;
         }
+        // Artificial boundary limit for AI
+        player2.vy = player2.y - player2.lastY; // Calculate velocity for hit physics
     }
+
+    if (player2.y < 0) { player2.y = 0; player2.vy = 0; }
+    if (player2.y > canvas.height - paddleProps.height) { player2.y = canvas.height - paddleProps.height; player2.vy = 0; }
+
+    // -----------------------------
 
     ball.x += ball.vx;
     ball.y += ball.vy;
@@ -168,14 +199,13 @@ function update() {
         ball.x - ball.radius > player1.x && ball.y > player1.y && ball.y < player1.y + paddleProps.height) {
         
         ball.vx *= -1;
-        ball.speed = Math.min(ball.speed + 0.5, 18); // Max speed cap
+        ball.speed = Math.min(ball.speed + 0.5, 18); 
         
         let relativeIntersect = (player1.y + (paddleProps.height / 2)) - ball.y;
         let normalizedIntersect = relativeIntersect / (paddleProps.height / 2);
         
-        // Add "English" (Spin) based on paddle movement
-        let paddleVelocity = player1.y - player1.lastY;
-        ball.vy = (normalizedIntersect * -5) + (paddleVelocity * 0.3);
+        // Add spin based on momentum (vy)
+        ball.vy = (normalizedIntersect * -5) + (player1.vy * 0.4);
         
         let currentSpeed = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
         ball.vx = (ball.vx / currentSpeed) * ball.speed;
@@ -194,8 +224,7 @@ function update() {
         let relativeIntersect = (player2.y + (paddleProps.height / 2)) - ball.y;
         let normalizedIntersect = relativeIntersect / (paddleProps.height / 2);
         
-        let paddleVelocity = player2.y - player2.lastY;
-        ball.vy = (normalizedIntersect * -5) + (paddleVelocity * 0.3);
+        ball.vy = (normalizedIntersect * -5) + (player2.vy * 0.4);
         
         let currentSpeed = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
         ball.vx = (ball.vx / currentSpeed) * ball.speed;
@@ -209,7 +238,7 @@ function update() {
         player2.score++;
         score2El.innerText = player2.score;
         playSound('score');
-        shakeAmount = 15; // Big shake on score
+        shakeAmount = 15;
         checkWin();
         if(gameState === 'PLAYING') resetBall(2);
     } else if (ball.x > canvas.width + 20) {
@@ -248,7 +277,6 @@ function endGame(winner) {
 function draw() {
     ctx.save();
 
-    // Apply Screen Shake
     if (shakeAmount > 0.5) {
         let dx = (Math.random() - 0.5) * shakeAmount;
         let dy = (Math.random() - 0.5) * shakeAmount;
@@ -256,11 +284,9 @@ function draw() {
         shakeAmount *= 0.9; 
     }
 
-    // Clear background with trail fade
     ctx.fillStyle = 'rgba(10, 10, 12, 0.5)';
     ctx.fillRect(-20, -20, canvas.width + 40, canvas.height + 40);
 
-    // Draw center dashed line
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.lineWidth = 2;
     ctx.setLineDash([15, 20]);
@@ -271,7 +297,6 @@ function draw() {
     ctx.setLineDash([]);
 
     if (gameState === 'PLAYING') {
-        // Draw Particles
         particles.forEach(p => {
             ctx.globalAlpha = p.life;
             ctx.fillStyle = p.color;
@@ -279,7 +304,6 @@ function draw() {
         });
         ctx.globalAlpha = 1;
 
-        // Draw Ball Trail
         ball.trail.forEach((p, index) => {
             const alpha = (index / ball.trail.length) * 0.5;
             ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
@@ -288,7 +312,6 @@ function draw() {
             ctx.fill();
         });
 
-        // Draw Ball
         ctx.fillStyle = '#ffffff';
         ctx.shadowColor = '#ffffff';
         ctx.shadowBlur = 10;
@@ -298,7 +321,6 @@ function draw() {
         ctx.shadowBlur = 0;
     }
 
-    // Draw Paddles
     ctx.fillStyle = player1.color;
     ctx.shadowColor = player1.color;
     ctx.shadowBlur = 15;
@@ -320,4 +342,4 @@ function gameLoop() {
     }
 }
 
-draw(); // Initial render
+draw();
