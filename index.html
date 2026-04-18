@@ -3,25 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Retro Pong</title>
+    <title>Pong</title>
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="crt">
     <div id="game-container">
         <header>
             <h1>PONG</h1>
             <div class="scoreboard">
-                <span id="score1">0</span>
-                <span class="divider">:</span>
-                <span id="score2">0</span>
+                <span id="score1" class="score">0</span>
+                <span class="divider"></span>
+                <span id="score2" class="score">0</span>
             </div>
         </header>
 
-        <canvas id="pongCanvas" width="800" height="500"></canvas>
+        <div class="canvas-wrapper">
+            <canvas id="pongCanvas" width="800" height="500"></canvas>
+        </div>
 
         <div id="controls-panel">
             <div class="control-group">
-                <label for="modeSelect">Game Mode:</label>
+                <label for="modeSelect">Game Mode</label>
                 <select id="modeSelect">
                     <option value="1">1 Player (vs AI)</option>
                     <option value="2">2 Players</option>
@@ -29,29 +31,30 @@
             </div>
             
             <div class="control-group">
-                <label for="paddleSpeed">Paddle Speed: <span id="speedValue">7</span></label>
-                <input type="range" id="paddleSpeed" min="4" max="15" value="7">
+                <label for="paddleSpeed">Paddle Speed: <span id="speedValue">8</span></label>
+                <input type="range" id="paddleSpeed" min="5" max="15" value="8">
             </div>
 
             <div class="control-group">
-                <label for="maxScore">Play to:</label>
+                <label for="maxScore">Play to</label>
                 <select id="maxScore">
-                    <option value="5">Best of 5 (First to 3)</option>
+                    <option value="5">First to 5</option>
                     <option value="10" selected>First to 10</option>
-                    <option value="Infinity">Unlimited</option>
+                    <option value="Infinity">Endless</option>
                 </select>
             </div>
             
-            <button id="startBtn">Start Game</button>
+            <button id="startBtn">INITIALIZE</button>
         </div>
 
         <div id="instructions">
-            <p><strong>Player 1:</strong> W / S | <strong>Player 2:</strong> Up / Down</p>
+            <p>P1: [W] [S] | P2: [UP] [DOWN]</p>
+            <p class="hint">Hint: Move the paddle while hitting the ball to add spin!</p>
         </div>
         
         <div id="gameOverScreen" class="hidden">
-            <h2 id="winnerText">Player 1 Wins!</h2>
-            <button id="restartBtn">Play Again</button>
+            <h2 id="winnerText">SYSTEM HALTED</h2>
+            <button id="restartBtn">REBOOT SYSTEM</button>
         </div>
     </div>
 
