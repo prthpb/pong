@@ -1,7 +1,6 @@
 const canvas = document.getElementById('pongCanvas');
 const ctx = canvas.getContext('2d');
 
-// UI Elements
 const score1El = document.getElementById('score1');
 const score2El = document.getElementById('score2');
 const modeSelect = document.getElementById('modeSelect');
@@ -13,13 +12,10 @@ const gameOverScreen = document.getElementById('gameOverScreen');
 const winnerText = document.getElementById('winnerText');
 const restartBtn = document.getElementById('restartBtn');
 
-// Audio Context (initialized on user interaction)
 let audioCtx;
 
 function initAudio() {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 }
 
 function playSound(type) {
@@ -28,240 +24,246 @@ function playSound(type) {
     
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    
     osc.connect(gain);
     gain.connect(audioCtx.destination);
     
-    if (type === 'paddle') {
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(400, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    if (type === 'hit') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.1);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
     } else if (type === 'wall') {
         osc.type = 'square';
-        osc.frequency.setValueAtTime(250, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
         gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.1);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
     } else if (type === 'score') {
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.5);
+        osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.3);
         gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.5);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
     }
 }
 
-// Game State
-let gameState = 'MENU'; // MENU, PLAYING, GAMEOVER
-let hue = 0; // For colorful trail
+let gameState = 'MENU'; 
 let animId;
+let hitPauseFrames = 0;
+let shakeAmount = 0;
+let hue = 0;
 
-const keys = {
-    w: false,
-    s: false,
-    ArrowUp: false,
-    ArrowDown: false
-};
+const keys = { w: false, s: false, ArrowUp: false, ArrowDown: false };
 
-// Entities
-const ball = {
-    x: canvas.width / 2,
-    y: canvas.height / 2,
-    radius: 8,
-    speed: 5,
-    vx: 5,
-    vy: 5,
-    trail: []
-};
+const ball = { x: 400, y: 250, radius: 6, speed: 6, vx: 6, vy: 6, trail: [] };
+const paddleProps = { width: 8, height: 75, speed: 8 };
 
-const paddleProps = {
-    width: 10,
-    height: 80,
-    speed: parseInt(speedInput.value)
-};
+const player1 = { x: 30, y: 212.5, lastY: 212.5, score: 0, color: '#ff0055' };
+const player2 = { x: 762, y: 212.5, lastY: 212.5, score: 0, color: '#00eeff' };
 
-const player1 = {
-    x: 20,
-    y: canvas.height / 2 - paddleProps.height / 2,
-    score: 0
-};
+let particles = [];
 
-const player2 = {
-    x: canvas.width - 30,
-    y: canvas.height / 2 - paddleProps.height / 2,
-    score: 0
-};
-
-// Event Listeners
-window.addEventListener('keydown', (e) => {
-    if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
-});
-
-window.addEventListener('keyup', (e) => {
-    if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
-});
+window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = true; });
+window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = false; });
 
 speedInput.addEventListener('input', (e) => {
     speedValue.innerText = e.target.value;
     paddleProps.speed = parseInt(e.target.value);
 });
 
-startBtn.addEventListener('click', () => {
-    initAudio();
-    startGame();
-});
+startBtn.addEventListener('click', () => { initAudio(); startGame(); });
+restartBtn.addEventListener('click', () => { gameOverScreen.classList.add('hidden'); startGame(); });
 
-restartBtn.addEventListener('click', () => {
-    gameOverScreen.classList.add('hidden');
-    startGame();
-});
+function spawnParticles(x, y, color, count, speedModifier) {
+    for (let i = 0; i < count; i++) {
+        particles.push({
+            x: x, y: y,
+            vx: (Math.random() - 0.5) * 10 * speedModifier,
+            vy: (Math.random() - 0.5) * 10 * speedModifier,
+            life: 1,
+            color: color,
+            size: Math.random() * 3 + 1
+        });
+    }
+}
 
-function resetBall() {
+function resetBall(scorer) {
     ball.x = canvas.width / 2;
     ball.y = canvas.height / 2;
-    ball.speed = 5;
-    ball.vx = (Math.random() > 0.5 ? 1 : -1) * ball.speed;
+    ball.speed = 6;
+    ball.vx = (scorer === 1 ? -1 : 1) * ball.speed;
     ball.vy = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 3 + 2);
     ball.trail = [];
 }
 
 function startGame() {
-    player1.score = 0;
-    player2.score = 0;
-    score1El.innerText = 0;
-    score2El.innerText = 0;
-    resetBall();
+    player1.score = 0; player2.score = 0;
+    score1El.innerText = 0; score2El.innerText = 0;
+    resetBall(Math.random() > 0.5 ? 1 : 2);
+    particles = [];
     gameState = 'PLAYING';
     if (animId) cancelAnimationFrame(animId);
     gameLoop();
 }
 
+function triggerHitJuice(x, y, color) {
+    playSound('hit');
+    spawnParticles(x, y, color, 15, 1);
+    hitPauseFrames = 4; // Freeze game for 4 frames
+    shakeAmount = ball.speed * 0.8; // Screen shake scales with ball speed
+}
+
 function update() {
     if (gameState !== 'PLAYING') return;
 
-    // Move Player 1
+    if (hitPauseFrames > 0) {
+        hitPauseFrames--;
+        return; 
+    }
+
+    player1.lastY = player1.y;
+    player2.lastY = player2.y;
+
     if (keys.w && player1.y > 0) player1.y -= paddleProps.speed;
     if (keys.s && player1.y < canvas.height - paddleProps.height) player1.y += paddleProps.speed;
 
-    // Move Player 2 / AI
     const mode = modeSelect.value;
     if (mode === '2') {
         if (keys.ArrowUp && player2.y > 0) player2.y -= paddleProps.speed;
         if (keys.ArrowDown && player2.y < canvas.height - paddleProps.height) player2.y += paddleProps.speed;
     } else {
-        // AI Logic
-        const aiSpeed = paddleProps.speed * 0.85; // slightly slower than max to make it beatable
-        const paddleCenter = player2.y + paddleProps.height / 2;
-        if (ball.y < paddleCenter - 10 && player2.y > 0) {
-            player2.y -= aiSpeed;
-        } else if (ball.y > paddleCenter + 10 && player2.y < canvas.height - paddleProps.height) {
-            player2.y += aiSpeed;
+        // Natural AI Interpolation
+        if (ball.vx > 0) {
+            let targetY = ball.y - paddleProps.height / 2;
+            player2.y += (targetY - player2.y) * 0.08; 
+            // Clamp to screen
+            if(player2.y < 0) player2.y = 0;
+            if(player2.y > canvas.height - paddleProps.height) player2.y = canvas.height - paddleProps.height;
+        } else {
+            let targetY = canvas.height / 2 - paddleProps.height / 2;
+            player2.y += (targetY - player2.y) * 0.03;
         }
     }
 
-    // Ball Movement
     ball.x += ball.vx;
     ball.y += ball.vy;
 
-    // Trail Logic
     ball.trail.push({ x: ball.x, y: ball.y });
-    if (ball.trail.length > 15) {
-        ball.trail.shift();
-    }
+    if (ball.trail.length > 10) ball.trail.shift();
     hue += 2;
 
-    // Wall Collision (Top/Bottom)
+    // Wall Collision
     if (ball.y - ball.radius < 0 || ball.y + ball.radius > canvas.height) {
         ball.vy *= -1;
         playSound('wall');
-        // Prevent sticking
+        spawnParticles(ball.x, ball.y, '#ffffff', 5, 0.5);
         ball.y = ball.y - ball.radius < 0 ? ball.radius : canvas.height - ball.radius;
     }
 
-    // Paddle Collision
-    // Player 1
-    if (ball.x - ball.radius < player1.x + paddleProps.width &&
-        ball.y > player1.y && ball.y < player1.y + paddleProps.height && ball.vx < 0) {
+    // Paddle 1 Collision
+    if (ball.vx < 0 && ball.x - ball.radius < player1.x + paddleProps.width &&
+        ball.x - ball.radius > player1.x && ball.y > player1.y && ball.y < player1.y + paddleProps.height) {
+        
         ball.vx *= -1;
-        ball.speed += 0.5; // Increase speed
+        ball.speed = Math.min(ball.speed + 0.5, 18); // Max speed cap
+        
         let relativeIntersect = (player1.y + (paddleProps.height / 2)) - ball.y;
         let normalizedIntersect = relativeIntersect / (paddleProps.height / 2);
-        ball.vy = normalizedIntersect * -6; // Bounce angle
         
-        // Apply speed vector calculation
+        // Add "English" (Spin) based on paddle movement
+        let paddleVelocity = player1.y - player1.lastY;
+        ball.vy = (normalizedIntersect * -5) + (paddleVelocity * 0.3);
+        
         let currentSpeed = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
         ball.vx = (ball.vx / currentSpeed) * ball.speed;
         ball.vy = (ball.vy / currentSpeed) * ball.speed;
         
-        playSound('paddle');
+        triggerHitJuice(ball.x, ball.y, player1.color);
     }
 
-    // Player 2
-    if (ball.x + ball.radius > player2.x &&
-        ball.y > player2.y && ball.y < player2.y + paddleProps.height && ball.vx > 0) {
+    // Paddle 2 Collision
+    if (ball.vx > 0 && ball.x + ball.radius > player2.x &&
+        ball.x + ball.radius < player2.x + paddleProps.width && ball.y > player2.y && ball.y < player2.y + paddleProps.height) {
+        
         ball.vx *= -1;
-        ball.speed += 0.5; // Increase speed
+        ball.speed = Math.min(ball.speed + 0.5, 18);
+        
         let relativeIntersect = (player2.y + (paddleProps.height / 2)) - ball.y;
         let normalizedIntersect = relativeIntersect / (paddleProps.height / 2);
-        ball.vy = normalizedIntersect * -6;
+        
+        let paddleVelocity = player2.y - player2.lastY;
+        ball.vy = (normalizedIntersect * -5) + (paddleVelocity * 0.3);
         
         let currentSpeed = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
         ball.vx = (ball.vx / currentSpeed) * ball.speed;
         ball.vy = (ball.vy / currentSpeed) * ball.speed;
 
-        playSound('paddle');
+        triggerHitJuice(ball.x, ball.y, player2.color);
     }
 
     // Scoring
-    if (ball.x < 0) {
+    if (ball.x < -20) {
         player2.score++;
         score2El.innerText = player2.score;
         playSound('score');
+        shakeAmount = 15; // Big shake on score
         checkWin();
-        if(gameState === 'PLAYING') resetBall();
-    } else if (ball.x > canvas.width) {
+        if(gameState === 'PLAYING') resetBall(2);
+    } else if (ball.x > canvas.width + 20) {
         player1.score++;
         score1El.innerText = player1.score;
         playSound('score');
+        shakeAmount = 15;
         checkWin();
-        if(gameState === 'PLAYING') resetBall();
+        if(gameState === 'PLAYING') resetBall(1);
+    }
+
+    // Update Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx; p.y += p.vy;
+        p.life -= 0.04;
+        if (p.life <= 0) particles.splice(i, 1);
     }
 }
 
 function checkWin() {
     let max = maxScoreSelect.value;
     if (max === 'Infinity') return;
+    max = parseInt(max);
     
-    max = max === '5' ? 3 : 10;
-    
-    if (player1.score >= max) {
-        endGame('Player 1');
-    } else if (player2.score >= max) {
-        const mode = modeSelect.value;
-        endGame(mode === '1' ? 'AI' : 'Player 2');
-    }
+    if (player1.score >= max) endGame('PLAYER 1');
+    else if (player2.score >= max) endGame(modeSelect.value === '1' ? 'SYSTEM AI' : 'PLAYER 2');
 }
 
 function endGame(winner) {
     gameState = 'GAMEOVER';
-    winnerText.innerText = `${winner} Wins!`;
+    winnerText.innerText = `${winner} WINS`;
     gameOverScreen.classList.remove('hidden');
 }
 
 function draw() {
-    // Clear canvas
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; // Slight transparency for trailing effect on paddles
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
 
-    // Draw center line
-    ctx.strokeStyle = '#333';
-    ctx.setLineDash([10, 15]);
+    // Apply Screen Shake
+    if (shakeAmount > 0.5) {
+        let dx = (Math.random() - 0.5) * shakeAmount;
+        let dy = (Math.random() - 0.5) * shakeAmount;
+        ctx.translate(dx, dy);
+        shakeAmount *= 0.9; 
+    }
+
+    // Clear background with trail fade
+    ctx.fillStyle = 'rgba(10, 10, 12, 0.5)';
+    ctx.fillRect(-20, -20, canvas.width + 40, canvas.height + 40);
+
+    // Draw center dashed line
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([15, 20]);
     ctx.beginPath();
     ctx.moveTo(canvas.width / 2, 0);
     ctx.lineTo(canvas.width / 2, canvas.height);
@@ -269,35 +271,53 @@ function draw() {
     ctx.setLineDash([]);
 
     if (gameState === 'PLAYING') {
+        // Draw Particles
+        particles.forEach(p => {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, p.size, p.size);
+        });
+        ctx.globalAlpha = 1;
+
         // Draw Ball Trail
         ball.trail.forEach((p, index) => {
-            const alpha = index / ball.trail.length;
-            ctx.fillStyle = `hsla(${hue + index * 5}, 100%, 50%, ${alpha})`;
+            const alpha = (index / ball.trail.length) * 0.5;
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
             ctx.beginPath();
-            ctx.arc(p.x, p.y, ball.radius * alpha, 0, Math.PI * 2);
+            ctx.arc(p.x, p.y, ball.radius * (index / ball.trail.length), 0, Math.PI * 2);
             ctx.fill();
         });
 
         // Draw Ball
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 10;
         ctx.beginPath();
         ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
         ctx.fill();
+        ctx.shadowBlur = 0;
     }
 
     // Draw Paddles
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = player1.color;
+    ctx.shadowColor = player1.color;
+    ctx.shadowBlur = 15;
     ctx.fillRect(player1.x, player1.y, paddleProps.width, paddleProps.height);
+
+    ctx.fillStyle = player2.color;
+    ctx.shadowColor = player2.color;
+    ctx.shadowBlur = 15;
     ctx.fillRect(player2.x, player2.y, paddleProps.width, paddleProps.height);
+    
+    ctx.restore();
 }
 
 function gameLoop() {
     update();
     draw();
-    if (gameState === 'PLAYING') {
+    if (gameState === 'PLAYING' || gameState === 'GAMEOVER') {
         animId = requestAnimationFrame(gameLoop);
     }
 }
 
-// Initial draw to show the board
-draw();
+draw(); // Initial render
