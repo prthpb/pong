@@ -64,22 +64,36 @@ const ball = { x: 400, y: 250, radius: 6, speed: 6, vx: 6, vy: 6, trail: [] };
 const paddleProps = { 
     width: 8, 
     height: 75, 
-    friction: 0.82, // How fast the paddle slows down (closer to 1 = more glide)
+    friction: 0.82, // How fast the paddle slows down
     acceleration: 2.5 // How fast it speeds up
 };
 
-// Added vy (vertical velocity) to track momentum
 const player1 = { x: 30, y: 212.5, vy: 0, lastY: 212.5, score: 0, color: '#ff0055' };
 const player2 = { x: 762, y: 212.5, vy: 0, lastY: 212.5, score: 0, color: '#00eeff' };
 
 let particles = [];
 
-window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = true; });
-window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = false; });
+// Updated key listeners to prevent default browser scrolling
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'w' || e.key === 'W') keys.w = true;
+    if (e.key === 's' || e.key === 'S') keys.s = true;
+    if (e.key === 'ArrowUp' || e.key === 'Up') keys.ArrowUp = true;
+    if (e.key === 'ArrowDown' || e.key === 'Down') keys.ArrowDown = true;
+    
+    if (['w', 'W', 's', 'S', 'ArrowUp', 'ArrowDown', 'Up', 'Down'].includes(e.key)) {
+        e.preventDefault();
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.key === 'w' || e.key === 'W') keys.w = false;
+    if (e.key === 's' || e.key === 'S') keys.s = false;
+    if (e.key === 'ArrowUp' || e.key === 'Up') keys.ArrowUp = false;
+    if (e.key === 'ArrowDown' || e.key === 'Down') keys.ArrowDown = false;
+});
 
 speedInput.addEventListener('input', (e) => {
     speedValue.innerText = e.target.value;
-    // Map the 5-15 slider to a reasonable acceleration curve
     paddleProps.acceleration = parseInt(e.target.value) * 0.3;
 });
 
@@ -170,7 +184,6 @@ function update() {
             let targetY = canvas.height / 2 - paddleProps.height / 2;
             player2.y += (targetY - player2.y) * 0.05;
         }
-        // Artificial boundary limit for AI
         player2.vy = player2.y - player2.lastY; // Calculate velocity for hit physics
     }
 
